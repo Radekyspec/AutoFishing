@@ -1,0 +1,4 @@
+apscheduler
+pycryptodome
+requests
+lxml
