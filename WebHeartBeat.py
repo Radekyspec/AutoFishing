@@ -17,35 +17,39 @@ from BiliUser import BiliUser
 
 class WebHeartBeat:
     """A thread used to send heartbeat pack.
-    
+
     === Public Attributes ===
     users: 
         a dictionary of BiliUser instances for users need to keep alive, 
         which key is uid and value is BiliUser instance.
     closed:
         a dictionary which key is room_id and value is the status of heartbeat worker.
-    
+    num: 
+        number of sent heartbeat
+
     === Private Attributes ===
     _executor: 
         internal ThreadPoolExecutor instance used to send heartbeat requests.
     """
     users: dict[int, BiliUser]
     closed: dict[int, bool]
+    num: int
     _executor: ThreadPoolExecutor
 
     def __init__(self, *args: tuple[int]) -> None:
         self.users = {uid: BiliUser(uid) for uid in args}
         self.closed = {}
+        self.num = 0
         self._executor = ThreadPoolExecutor()
-    
+
     def add_user(self, *uid: tuple[int]) -> None:
         for user_id in uid:
             self.users[user_id] = BiliUser(user_id)
-    
+
     def del_user(self, *uid: tuple[int]) -> None:
         for user_id in uid:
             self.users[user_id].stop()
-    
+
     def on_del_room(self, callback: Optional[Callable], *args) -> Any:
         for room_id in args:
             self.closed[room_id] = True
@@ -56,7 +60,7 @@ class WebHeartBeat:
         if uid not in self.users:
             raise ValueError(f"UID {uid} does not exist in heartbeat manager.")
         self.users[uid].set_cookies(*args, **kwargs)
-    
+
     def add_heartbeat(self, uid: int, *room_ids) -> None:
         """Add <self._web_heartbeat>, <self._X_heartbeat> and <self._heartbeat> into thread pool.
         Room id variable <room_id> must be real room id, not short id.
@@ -86,10 +90,11 @@ class WebHeartBeat:
             "referer": f"https://live.bilibili.com/{room_id}",
             "user-agent": user.cookie.ua,
         }
-        while not self.closed[room_id]:
+        while not self.closed[room_id] and self.num <= 15:
             time.sleep(interval)
             # {interval}|{room_id}|1|0
-            hb_data = b64encode(f"{interval}|{room_id}|1|0".encode(encoding="utf-8")).decode(encoding="utf-8")
+            hb_data = b64encode(f"{interval}|{room_id}|1|0".encode(
+                encoding="utf-8")).decode(encoding="utf-8")
             params = {
                 "hb": hb_data,
                 "pf": "web",
@@ -98,7 +103,8 @@ class WebHeartBeat:
                 "cookie": user.cookie.cookie_string
             })
             try:
-                response = requests.get(url, params=params, headers=headers).json()
+                response = requests.get(
+                    url, params=params, headers=headers).json()
                 # print(response)
                 assert response["code"] == 0, f"Error sending webHeartBeat, {response}"
                 interval = response["data"]["next_interval"]
@@ -117,7 +123,7 @@ class WebHeartBeat:
             "referer": f"https://live.bilibili.com/{room_id}",
             "user-agent": user.cookie.ua,
         }
-        while not self.closed[room_id]:
+        while not self.closed[room_id] and self.num <= 15:
             headers.update({
                 "cookie": user.cookie.cookie_string
             })
@@ -140,7 +146,6 @@ class WebHeartBeat:
         buvid = self._device_hash()
         b_uuid = str(uuid1())
         device = f"[\"{buvid}\",\"{b_uuid}\"]"
-        num = 0
         headers = {
             "cookie": user.cookie.cookie_string,
             "origin": "https://live.bilibili.com",
@@ -149,7 +154,7 @@ class WebHeartBeat:
         }
         base_info = requests.get(info_url, headers=headers).json()["data"]
         ruid, area_id, parent_area = base_info["uid"], base_info["area_id"], base_info["parent_area_id"]
-        ids = f"[{parent_area},{area_id},{num},{room_id}]"
+        ids = f"[{parent_area},{area_id},{self.num},{room_id}]"
         ets = int(time.time())
         interval, secret_key, secret_rule = self._E_heartbeat(user=user,
                                                               room_id=room_id,
@@ -157,20 +162,20 @@ class WebHeartBeat:
                                                               device=device,
                                                               ruid=ruid)
         time.sleep(interval)
-        num += 1
-        while not self.closed[room_id]:
+        self.num += 1
+        while not self.closed[room_id] and self.num <= 15:
             headers.update({
                 "cookie": user.cookie.cookie_string,
             })
             base_info = requests.get(info_url, headers=headers).json()["data"]
             area_id, parent_area = base_info["area_id"], base_info["parent_area_id"]
-            ids = f"[{parent_area},{area_id},{num},{room_id}]"
-            ts = int(str(time.time_ns())[:13])
+            ids = f"[{parent_area},{area_id},{self.num},{room_id}]"
+            ts = int(time.time() * 1000)
             parsed_data = json.dumps({
                 "platform": "web",
                 "parent_id": parent_area,
                 "area_id": area_id,
-                "seq_id": num,
+                "seq_id": self.num,
                 "room_id": room_id,
                 "buvid": buvid,
                 "uuid": b_uuid,
@@ -195,7 +200,8 @@ class WebHeartBeat:
                 "visit_id": "",
             }
             try:
-                response = requests.post(url, headers=headers, data=data).json()
+                response = requests.post(
+                    url, headers=headers, data=data).json()
                 assert response["code"] == 0, f"Error sending X heartbeat, {response}"
             except:
                 self.on_del_room(user.uid, room_id)
@@ -204,9 +210,8 @@ class WebHeartBeat:
                 interval, secret_key, secret_rule = response["data"]["heartbeat_interval"], \
                     response["data"]["secret_key"], response["data"]["secret_rule"]
                 ets = int(time.time())
-                num += 1
+                self.num += 1
                 time.sleep(interval)
-
 
     @staticmethod
     def _gen_s(parsed_data: str, secret_rules: list[int], key: str) -> str:
@@ -214,30 +219,37 @@ class WebHeartBeat:
             match rule:
                 case 0:
                     parsed_data = hmac.new(key=key.encode(encoding="utf-8"),
-                                           msg=parsed_data.encode(encoding="utf-8"),
+                                           msg=parsed_data.encode(
+                                               encoding="utf-8"),
                                            digestmod=hashlib.md5).hexdigest()
                     parsed_data = hmac.new(key=key.encode(encoding="utf-8"),
-                                           msg=parsed_data.encode(encoding="utf-8"),
+                                           msg=parsed_data.encode(
+                                               encoding="utf-8"),
                                            digestmod=hashlib.md5).hexdigest()
                 case 1:
                     parsed_data = hmac.new(key=key.encode(encoding="utf-8"),
-                                           msg=parsed_data.encode(encoding="utf-8"),
+                                           msg=parsed_data.encode(
+                                               encoding="utf-8"),
                                            digestmod=hashlib.sha1).hexdigest()
                 case 2:
                     parsed_data = hmac.new(key=key.encode(encoding="utf-8"),
-                                           msg=parsed_data.encode(encoding="utf-8"),
+                                           msg=parsed_data.encode(
+                                               encoding="utf-8"),
                                            digestmod=hashlib.sha256).hexdigest()
                 case 3:
                     parsed_data = hmac.new(key=key.encode(encoding="utf-8"),
-                                           msg=parsed_data.encode(encoding="utf-8"),
+                                           msg=parsed_data.encode(
+                                               encoding="utf-8"),
                                            digestmod=hashlib.sha224).hexdigest()
                 case 4:
                     parsed_data = hmac.new(key=key.encode(encoding="utf-8"),
-                                           msg=parsed_data.encode(encoding="utf-8"),
+                                           msg=parsed_data.encode(
+                                               encoding="utf-8"),
                                            digestmod=hashlib.sha512).hexdigest()
                 case 5:
                     parsed_data = hmac.new(key=key.encode(encoding="utf-8"),
-                                           msg=parsed_data.encode(encoding="utf-8"),
+                                           msg=parsed_data.encode(
+                                               encoding="utf-8"),
                                            digestmod=hashlib.sha384).hexdigest()
                 case _:
                     pass
@@ -255,7 +267,7 @@ class WebHeartBeat:
             "referer": f"https://live.bilibili.com/{room_id}",
             "user-agent": user.cookie.ua,
         }
-        ts = str(time.time_ns())[:13]
+        ts = str(int(time.time() * 1000))
         data = {
             "id": ids,
             "device": device,
@@ -276,7 +288,7 @@ class WebHeartBeat:
         except:
             print(traceback.format_exc())
             self.on_del_room(user.uid, room_id)
-    
+
     def send_danmaku(self, uid: int, room_id: int, content: str) -> None:
         url = "https://api.live.bilibili.com/msg/send"
         cookie = self.users[uid].cookie
@@ -306,7 +318,8 @@ class WebHeartBeat:
     @staticmethod
     def _device_hash() -> str:
         hash_str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()+-".split()
-        rand_str = f"{str(time.time_ns())[:13]}" + "".join(random.choices(hash_str, k=5))
+        rand_str = f"{int(time.time() * 1000)}" + \
+            "".join(random.choices(hash_str, k=5))
         return hashlib.md5(rand_str.encode(encoding="utf-8")).hexdigest()
 
 
