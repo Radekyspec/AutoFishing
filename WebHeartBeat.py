@@ -33,13 +33,13 @@ class WebHeartBeat:
     """
     users: dict[int, BiliUser]
     closed: dict[int, bool]
-    num: int
+    num: dict[int, int]
     _executor: ThreadPoolExecutor
 
     def __init__(self, *args: tuple[int]) -> None:
         self.users = {uid: BiliUser(uid) for uid in args}
         self.closed = {}
-        self.num = 0
+        self.num = {}
         self._executor = ThreadPoolExecutor()
 
     def add_user(self, *uid: tuple[int]) -> None:
@@ -70,6 +70,7 @@ class WebHeartBeat:
             if room_id in self.closed and not self.closed[room_id]:
                 continue
             self.closed[room_id] = False
+            self.num[uid] = 0
             self._executor.submit(self._web_heartbeat, user, room_id)
             print(f"[{uid}][{room_id}]", "webHeartBeat start")
             self._executor.submit(self._X_heartbeat, user, room_id)
@@ -90,7 +91,7 @@ class WebHeartBeat:
             "referer": f"https://live.bilibili.com/{room_id}",
             "user-agent": user.cookie.ua,
         }
-        while not self.closed[room_id] and self.num <= 15:
+        while not self.closed[room_id] and self.num[user.uid] <= 15:
             time.sleep(interval)
             # {interval}|{room_id}|1|0
             hb_data = b64encode(f"{interval}|{room_id}|1|0".encode(
@@ -111,6 +112,7 @@ class WebHeartBeat:
             except:
                 self.on_del_room(user.uid, room_id)
                 print(traceback.format_exc())
+        print(f"[{user.uid}][{room_id}]", "webHeartBeat end")
 
     def _heartbeat(self, user: BiliUser, room_id: int) -> None:
         """Send heartBeat.
@@ -123,7 +125,7 @@ class WebHeartBeat:
             "referer": f"https://live.bilibili.com/{room_id}",
             "user-agent": user.cookie.ua,
         }
-        while not self.closed[room_id] and self.num <= 15:
+        while not self.closed[room_id] and self.num[user.uid] <= 15:
             headers.update({
                 "cookie": user.cookie.cookie_string
             })
@@ -136,6 +138,7 @@ class WebHeartBeat:
                 self.on_del_room(user.uid, room_id)
                 print(traceback.format_exc())
             time.sleep(40)
+        print(f"[{user.uid}][{room_id}]", "heartBeat end")
 
     def _X_heartbeat(self, user: BiliUser, room_id: int) -> None:
         """Send X heartbeat.
@@ -154,7 +157,7 @@ class WebHeartBeat:
         }
         base_info = requests.get(info_url, headers=headers).json()["data"]
         ruid, area_id, parent_area = base_info["uid"], base_info["area_id"], base_info["parent_area_id"]
-        ids = f"[{parent_area},{area_id},{self.num},{room_id}]"
+        ids = f"[{parent_area},{area_id},{self.num[user.uid]},{room_id}]"
         ets = int(time.time())
         interval, secret_key, secret_rule = self._E_heartbeat(user=user,
                                                               room_id=room_id,
@@ -162,20 +165,20 @@ class WebHeartBeat:
                                                               device=device,
                                                               ruid=ruid)
         time.sleep(interval)
-        self.num += 1
-        while not self.closed[room_id] and self.num <= 15:
+        self.num[user.uid] += 1
+        while not self.closed[room_id] and self.num[user.uid] <= 15:
             headers.update({
                 "cookie": user.cookie.cookie_string,
             })
             base_info = requests.get(info_url, headers=headers).json()["data"]
             area_id, parent_area = base_info["area_id"], base_info["parent_area_id"]
-            ids = f"[{parent_area},{area_id},{self.num},{room_id}]"
+            ids = f"[{parent_area},{area_id},{self.num[user.uid]},{room_id}]"
             ts = int(time.time() * 1000)
             parsed_data = json.dumps({
                 "platform": "web",
                 "parent_id": parent_area,
                 "area_id": area_id,
-                "seq_id": self.num,
+                "seq_id": self.num[user.uid],
                 "room_id": room_id,
                 "buvid": buvid,
                 "uuid": b_uuid,
@@ -210,8 +213,9 @@ class WebHeartBeat:
                 interval, secret_key, secret_rule = response["data"]["heartbeat_interval"], \
                     response["data"]["secret_key"], response["data"]["secret_rule"]
                 ets = int(time.time())
-                self.num += 1
+                self.num[user.uid] += 1
                 time.sleep(interval)
+        print(f"[{user.uid}][{room_id}]", "X heartbeat end")
 
     @staticmethod
     def _gen_s(parsed_data: str, secret_rules: list[int], key: str) -> str:
