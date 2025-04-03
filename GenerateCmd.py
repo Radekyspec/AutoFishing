@@ -24,6 +24,7 @@ def generate_from_stdin():
     print(result)
     pyperclip.copy(result[1:-1])
     print("Result copied to clipboard.")
+    input()
 
 
 if __name__ == '__main__':

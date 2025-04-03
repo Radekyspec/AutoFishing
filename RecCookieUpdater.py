@@ -1,15 +1,15 @@
 import json
+import sys
 import os
 import random
 import requests
 
-HOST = "http://localhost:2356"
 URI = "/api/config/global"
-PATH = "./cookies.json"
+PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies.json")
 
-URL = HOST + URI
-def get_config():
-    return requests.get(URL).json()
+
+def get_config(host):
+    return requests.get(host + URI).json()
 
 
 def fetch_cookie():
@@ -26,8 +26,8 @@ def fetch_cookie():
                       f"sid={content['sid']}", ])
 
 
-def update_config():
-    cur_config = get_config()
+def update_config(host):
+    cur_config = get_config(host)
     cur_config["optionalCookie"]["hasValue"] = True
     cur_config["optionalCookie"]["value"] = fetch_cookie()
     headers = {
@@ -36,16 +36,32 @@ def update_config():
     }
     cur_config = json.dumps(
         cur_config, ensure_ascii=False, separators=(",", ":"))
-    assert requests.post(URL, data=cur_config, headers=headers).status_code, 200
+    assert requests.post(host + URI, data=cur_config, headers=headers).status_code, 200
     print("Update success")
 
 
-if __name__ == '__main__':
+def main():
     from apscheduler.schedulers.blocking import BlockingScheduler
     from apscheduler.triggers.interval import IntervalTrigger
     from datetime import datetime
+
+    if "py" in sys.argv[0]:
+        if len(sys.argv) < 3:
+            print("Usage: python3 RecCookieupdater.py host ...")
+            return
+        host = sys.argv[2]
+    else:
+        if len(sys.argv) < 2:
+            print("Usage: .\RecCookieupdater.exe host ...")
+            input()
+            return
+        host = sys.argv[1]
     scheduler = BlockingScheduler()
-    scheduler.add_job(update_config, misfire_grace_time=3600, max_instances=10, trigger=IntervalTrigger(hours=1),
+    scheduler.add_job(update_config, args=(host,), misfire_grace_time=3600, max_instances=10, trigger=IntervalTrigger(hours=1),
                       next_run_time=datetime.now())
     scheduler.start()
     # update_config()
+
+
+if __name__ == '__main__':
+    main()

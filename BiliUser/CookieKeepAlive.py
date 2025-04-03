@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 import time
 
 from random import choice
@@ -18,13 +19,21 @@ class CookieKeepAlive(Thread):
         self._cookies = {}
         self._uids = set()
         self._closed = False
+    
+    @staticmethod
+    def _get_json_path() ->  str:
+        import os
+        if "py" in sys.argv[0]:
+            return "cookies.json"
+        else:
+            return os.path.join(os.path.abspath(__compiled__.containing_dir), "cookies.json")
 
     def load_cookie(self) -> set[int]:
         """Load cookies from saved file.
         """
         new_uid = set()
         try:
-            with open("cookies.json", "r", encoding="utf-8") as f:
+            with open(self._get_json_path(), "r", encoding="utf-8") as f:
                 content = f.read()
             content = json.loads(content)
         except FileNotFoundError:
