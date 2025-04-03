@@ -17,7 +17,7 @@
 ## 入口点
 
 ### 添加账号
-运行`GenerateCmd.py`, 根据提示输入对应Cookie值: 
+运行`GenerateCmd.py`, 或下载Release中的`GenerateCmd.exe`，根据提示输入对应Cookie值: 
 * `SESSDATA`
 * `bili_jct`(`csrf`)
 * `UID`
@@ -25,7 +25,9 @@
 * `sid`
 * `refresh_token`(web端该值存储在`localStorage`中的`ac_time_value`字段中，在登录成功后返回并保存)
 
-复制输出的内容，新建另一个`cookies.json`文件，首先输入一对英文大括号`{}`，再在**大括号内**粘贴复制的内容
+复制输出的内容，如果使用的是Windows系统则会自动复制到剪切板，无需手动复制
+
+在**同目录**下新建另一个`cookies.json`文件，首先输入一对英文大括号`{}`，再在**大括号内**粘贴复制的内容
 
 如有多个账号，重复运行`GenerateCmd.py`，并将获取到的内容以英文半角逗号`,`分隔即可
 
@@ -58,13 +60,30 @@
 ### 运行
 在终端中输入`python3 app.py`来运行
 
-上一步中粘贴导入的cookie便会开始自动刷新，最新的cookie会存放在目录下`cookies.json`文件内
+或在Release中下载`app.exe`，双击运行，注意此时`cookies.json`应和`app.exe`处于同一个目录下
+
+上一步中粘贴导入的cookie便会开始自动刷新，最新的cookie会存放在同目录下`cookies.json`文件内
 该文件包含所有敏感信息，请确保文件安全，如意外泄漏文件内容需立即更改所有导入账号的密码
 
 ## 关于录播姬cookie自动刷新
 
 首先**需要打开录播姬的HTTP API功能**
 
-打开目录下的`RecCookieUpdater.py`文件, 修改文件开头的`HOST`字段为**在录播姬启动时绑定的HTTP接口地址**，如果是跟着[录播姬文档](https://rec.danmuji.org/reference/arguments/)操作则无需修改，默认值为`http://localhost:2356`
+在终端输入`python3 RecCookieUpdater.py host`
 
-运行：`python3 RecCookieUpdater.py`，之后每隔一小时便会随机读取文件中的一个账户cookie进行更新替换
+或者下载Release中的`RecCookieUpdater.exe`文件，确保该文件和`cookies.json`放在**同一个目录**，在终端输入`.\RecCookieUpdater.exe host`
+
+替换`host`字段为**在录播姬启动时绑定的HTTP接口地址**，详情参考[录播姬文档](https://rec.danmuji.org/reference/arguments/)，默认值为`http://localhost:2356`，如果跟着录播姬文档操作可直接复制该默认值
+
+最终的命令应该具有如下格式：
+
+```bash
+python3 RecCookieUpdater.py http://localhost:2356
+```
+
+或是
+```bash
+.\RecCookieUpdater.exe http://localhost:2356
+```
+
+回车运行，之后每隔一小时便会随机读取文件中的一个账户cookie进行更新替换
