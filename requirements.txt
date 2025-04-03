@@ -2,3 +2,5 @@ apscheduler
 pycryptodome
 requests
 lxml
+pyperclip
+flask
