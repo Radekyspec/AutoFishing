@@ -9,7 +9,7 @@
 建议使用venv隔离环境
 
 ### 拉取仓库
-* `git clone https://github.dev/Radekyspec/AutoFishing.git`
+* `git clone https://github.com/Radekyspec/AutoFishing.git`
 
 ### 安装依赖
 * `pip3 install -r requirements.txt`
@@ -54,6 +54,9 @@
 
 ### 运行
 在终端中输入`python3 app.py`来运行
+
+上一步中粘贴导入的cookie便会开始自动刷新，最新的cookie会存放在目录下`cookies.json`文件内
+该文件包含所有敏感信息，请确保文件安全，如意外泄漏文件内容需立即更改所有导入账号的密码
 
 ## 关于录播姬cookie自动刷新
 
