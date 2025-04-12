@@ -219,14 +219,3 @@ JNrRuoEUXpabUzGB8QIDAQAB
                 self._error_times = 0
             finally:
                 time.sleep(s_t)
-
-
-if __name__ == '__main__':
-    cookie = BiliCookie(3546641680304175)
-    cookie.set_cookies(
-        sessdata="cfa11db3%2C1732338920%2C9bfb6%2A52CjC6ktimp17swdWrBpHyNQl034Vb9d67TBNM5V1z7SGJtbiu1dhgps7KmWrrFXeyBwwSVkVnZHo0T0JZQlhwTURkTDJvYm5wTUMtNGF6Y3Fkb2pTOV85Qk5LcVZ4blpTWnpBUnZoQzJyaFUzd2pobmtVR19GN0dMSF9WbV9TbUpyOURFbHlaRk13IIEC",
-        csrf="5a46b7bb20852b675d65af8eaa1a7bd4",
-        uid_ckmd5="c5ef003cd6e82155",
-        sid="g00xhtk1",
-        refresh_token="38a906a8a4700e0d1a40c5dd9f78f852")
-    print(cookie._check_expires())

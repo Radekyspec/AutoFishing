@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import sys
 import time
 
 from random import choice
@@ -23,10 +22,10 @@ class CookieKeepAlive(Thread):
     @staticmethod
     def _get_json_path() ->  str:
         import os
-        if "py" in sys.argv[0]:
-            return "cookies.json"
-        else:
+        try:
             return os.path.join(os.path.abspath(__compiled__.containing_dir), "cookies.json")
+        except NameError:
+            return "cookies.json"
 
     def load_cookie(self) -> set[int]:
         """Load cookies from saved file.
@@ -101,12 +100,3 @@ class CookieKeepAlive(Thread):
         self._closed = True
         for uid in self._cookies:
             self._cookies[uid].stop_update()
-
-
-if __name__ == '__main__':
-    cookie = CookieKeepAlive()
-    cookie.start()
-    try:
-        cookie.join()
-    except KeyboardInterrupt:
-        cookie.close()
