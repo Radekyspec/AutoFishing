@@ -50,14 +50,13 @@ def main():
             print("Usage: .\RecCookieupdater.exe host ...")
             input()
             return
-        host = sys.argv[1]
     except NameError:
         f_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies.json")
-        if len(sys.argv) < 3:
+        if len(sys.argv) < 2:
             print("Usage: python3 RecCookieupdater.py host ...")
             return
-        host = sys.argv[2]
-    
+
+    host = sys.argv[1]
     scheduler = BlockingScheduler()
     scheduler.add_job(update_config, args=(host,f_path), misfire_grace_time=3600, max_instances=10, trigger=IntervalTrigger(hours=1),
                       next_run_time=datetime.now())
